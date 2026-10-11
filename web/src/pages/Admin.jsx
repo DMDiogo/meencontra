@@ -1,6 +1,6 @@
 import { Building2, LogOut, Menu, PenSquare, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { atualizarEmpresa, criarEmpresa, eliminarEmpresa, listarEmpresas, photoUrl } from "../lib/api";
 import { ASSETS } from "../lib/assets";
 import { clearAdminSession, isAdminLoggedIn } from "../lib/auth";
@@ -13,6 +13,7 @@ const TABS = [
 ];
 
 export default function Admin() {
+  const location = useLocation();
   const navigate = useNavigate();
   const [tab, setTab] = useState("cadastrar");
   const [menu, setMenu] = useState(false);
@@ -20,6 +21,7 @@ export default function Admin() {
   const [msg, setMsg] = useState("");
   const [zoom, setZoom] = useState("");
   const loggedIn = isAdminLoggedIn();
+  const preview = import.meta.env.DEV && new URLSearchParams(location.search).get("preview") === "1";
 
   async function refresh() {
     try {
@@ -31,10 +33,10 @@ export default function Admin() {
   }
 
   useEffect(() => {
-    if (loggedIn) refresh();
-  }, [loggedIn]);
+    if (loggedIn && !preview) refresh();
+  }, [loggedIn, preview]);
 
-  if (!loggedIn) return <Navigate to="/login" replace />;
+  if (!loggedIn && !preview) return <Navigate to="/login" replace />;
 
   function flash(text) {
     setMsg(text);
@@ -112,6 +114,11 @@ export default function Admin() {
         ) : null}
 
         <main className="flex-1 overflow-auto p-4 sm:p-6">
+          {preview ? (
+            <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+              Pré-visualização local: os formulários e as operações precisam do servidor e da base de dados.
+            </p>
+          ) : null}
           {msg ? <p className="mb-4 rounded-xl bg-emerald-50 px-4 py-3 font-medium text-emerald-800">{msg}</p> : null}
           {tab === "cadastrar" && <Cadastrar onDone={refresh} flash={flash} />}
           {tab === "atualizar" && <Atualizar empresas={empresas} onDone={refresh} flash={flash} />}
