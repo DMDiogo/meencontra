@@ -2,11 +2,8 @@ import { useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthLayout from "../components/AuthLayout";
 import CriarConta from "../components/CriarConta";
-
-// Ligar ao teu backend aqui. Deve criar a conta com o tipo ("cliente" | "proprietario").
-async function criarConta({ tipo, nome, email, password }) {
-  throw new Error("A criação de conta ainda não está ligada ao servidor.");
-}
+import { signUp } from "../lib/auth";
+import type { DadosConta, TipoConta } from "../lib/types";
 
 export default function Registar() {
   const navigate = useNavigate();
@@ -14,15 +11,27 @@ export default function Registar() {
 
   // /registar?tipo=proprietario já abre com o tipo escolhido
   const t = params.get("tipo");
-  const tipoInicial = t === "cliente" || t === "proprietario" ? t : null;
+  const tipoInicial: TipoConta | null = t === "cliente" || t === "proprietario" ? t : null;
 
   useEffect(() => {
     document.title = "Criar conta · Me Encontra";
   }, []);
 
-  async function handleSubmit(dados) {
-    await criarConta(dados);
-    navigate(dados.tipo === "proprietario" ? "/admin" : "/", { replace: true });
+  async function handleSubmit(dados: DadosConta) {
+    const { profile, needsConfirmation } = await signUp({
+      email: dados.email,
+      password: dados.password,
+      nome: dados.nome,
+      role: dados.tipo === "proprietario" ? "dono" : "cliente",
+    });
+    if (needsConfirmation) {
+      navigate("/login", {
+        replace: true,
+        state: { message: "Conta criada. Confirma o email antes de iniciar sessão." },
+      });
+      return;
+    }
+    navigate(profile?.role === "dono" ? "/proprietario" : "/", { replace: true });
   }
 
   return (

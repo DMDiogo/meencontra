@@ -1,7 +1,7 @@
 import { ASSETS } from "../lib/assets";
 import { PATTERN_LIGHT } from "../lib/images";
 
-export default function Preloader({ show }) {
+export default function Preloader({ show }: { show: boolean }) {
   if (!show) return null;
   return (
     <div

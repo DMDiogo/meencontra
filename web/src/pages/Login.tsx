@@ -1,9 +1,10 @@
 import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+
+type LoginState = { message?: string };
 import AuthLayout from "../components/AuthLayout";
-import { loginAdmin } from "../lib/api";
-import { setAdminSession } from "../lib/auth";
+import { signIn } from "../lib/auth";
 
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-900 placeholder:text-slate-400 transition focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15";
@@ -11,10 +12,8 @@ const inputClass =
 export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  // Se o utilizador foi mandado para o login por uma página protegida, volta para lá
-  const destino = location.state?.from?.pathname || "/admin";
-
-  const [username, setUsername] = useState("");
+  const state = location.state as LoginState | null;
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [capsOn, setCapsOn] = useState(false);
@@ -25,21 +24,23 @@ export default function Login() {
     document.title = "Entrar · Me Encontra";
   }, []);
 
-  async function onSubmit(e) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
     setBusy(true);
     setErro("");
     try {
-      await loginAdmin(username.trim(), password);
-      setAdminSession();
-      navigate(destino, { replace: true });
+      const profile = await signIn(email.trim(), password);
+      navigate(profile.role === "admin" ? "/admin" : profile.role === "dono" ? "/proprietario" : "/", {
+        replace: true,
+      });
     } catch (err) {
-      const offline = /failed to fetch|network/i.test(err?.message || "");
+      const message = err instanceof Error ? err.message : "";
+      const offline = /failed to fetch|network/i.test(message);
       setErro(
         offline
           ? "Não foi possível ligar ao servidor. Verifica a tua ligação e tenta outra vez."
-          : err?.message || "Utilizador ou senha incorretos. Tenta novamente."
+          : message || "Utilizador ou senha incorretos. Tenta novamente."
       );
       setPassword("");
     } finally {
@@ -54,20 +55,21 @@ export default function Login() {
 
       <form onSubmit={onSubmit} className="mt-7 space-y-5">
         <div>
-          <label htmlFor="username" className="mb-1.5 block text-sm font-semibold text-slate-700">
-            Utilizador
+          <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-slate-700">
+            Email
           </label>
           <input
-            id="username"
-            name="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            id="email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
             autoFocus
-            autoComplete="username"
+            autoComplete="email"
             autoCapitalize="none"
             spellCheck={false}
-            placeholder="O teu utilizador"
+            placeholder="teu@email.com"
             className={inputClass}
           />
         </div>
@@ -107,6 +109,12 @@ export default function Login() {
           </div>
           {capsOn && <p className="mt-1.5 text-sm font-medium text-amber-700">Caps Lock está ligado.</p>}
         </div>
+
+        {state?.message && (
+          <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            {state.message}
+          </p>
+        )}
 
         {erro && (
           <div

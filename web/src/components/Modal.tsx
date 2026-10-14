@@ -1,13 +1,21 @@
 import { X } from "lucide-react";
-import { useEffect, useId } from "react";
+import { useEffect, useId, type ReactNode } from "react";
 
-export default function Modal({ open, onClose, title, children, wide = false }) {
+type ModalProps = {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children?: ReactNode;
+  wide?: boolean;
+};
+
+export default function Modal({ open, onClose, title, children, wide = false }: ModalProps) {
   const titleId = useId();
 
   // Fechar com Esc e bloquear o scroll da página por trás enquanto está aberto
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => e.key === "Escape" && onClose?.();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";

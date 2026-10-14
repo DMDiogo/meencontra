@@ -1,18 +1,19 @@
 import { AlertCircle, ArrowDown, Building2, Check, Eye, EyeOff, Loader2, Search, Store, User } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, type FormEvent } from "react";
+import type { DadosConta, TipoConta } from "../lib/types";
 
-const TIPOS = [
+const TIPOS: { id: TipoConta; titulo: string; texto: string; Icon: typeof Search; botao: string }[] = [
   {
     id: "cliente",
     titulo: "Sou cliente",
-    texto: "Quero encontrar estabelecimentos, guardar favoritos e escrever avaliações.",
+    texto: "Quero descobrir empresas, serviços e estabelecimentos perto de mim.",
     Icon: Search,
     botao: "Criar conta de cliente",
   },
   {
     id: "proprietario",
     titulo: "Sou proprietário",
-    texto: "Quero divulgar o meu negócio e receber contactos ou reservas.",
+    texto: "Quero divulgar o meu negócio e publicar os seus dados e fotografias.",
     Icon: Store,
     botao: "Criar conta de proprietário",
   },
@@ -33,18 +34,24 @@ function Seta() {
  * onSubmit({ tipo, nome, email, password }) devolve uma Promise.
  * Se lançar erro, a mensagem aparece no formulário.
  */
-export default function CriarConta({ onSubmit, tipoInicial = null }) {
-  const [tipo, setTipo] = useState(tipoInicial);
+type CriarContaProps = {
+  onSubmit: (dados: DadosConta) => Promise<void>;
+  tipoInicial?: TipoConta | null;
+};
+
+export default function CriarConta({ onSubmit, tipoInicial = null }: CriarContaProps) {
+  const [tipo, setTipo] = useState<TipoConta | null>(tipoInicial);
   const [form, setForm] = useState({ nome: "", email: "", password: "" });
   const [showPass, setShowPass] = useState(false);
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
-  const formRef = useRef(null);
+  const formRef = useRef<HTMLDivElement>(null);
 
-  const set = (campo) => (e) => setForm((f) => ({ ...f, [campo]: e.target.value }));
+  const set = (campo: "nome" | "email" | "password") => (e: React.ChangeEvent<HTMLInputElement>) =>
+    setForm((f) => ({ ...f, [campo]: e.target.value }));
   const atual = TIPOS.find((t) => t.id === tipo);
 
-  function escolher(id) {
+  function escolher(id: TipoConta) {
     const primeiraEscolha = !tipo;
     setTipo(id);
     // No telemóvel o formulário nasce fora do ecrã: levamos o utilizador até ele
@@ -55,7 +62,7 @@ export default function CriarConta({ onSubmit, tipoInicial = null }) {
     }
   }
 
-  async function handleSubmit(e) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (loading) return;
     setErro("");
@@ -65,13 +72,15 @@ export default function CriarConta({ onSubmit, tipoInicial = null }) {
     }
     setLoading(true);
     try {
+      if (!tipo) return;
       await onSubmit({ tipo, ...form, nome: form.nome.trim(), email: form.email.trim() });
     } catch (err) {
-      const offline = /failed to fetch|network/i.test(err?.message || "");
+      const message = err instanceof Error ? err.message : "";
+      const offline = /failed to fetch|network/i.test(message);
       setErro(
         offline
           ? "Não foi possível ligar ao servidor. Verifica a tua ligação e tenta outra vez."
-          : err?.message || "Não foi possível criar a conta. Tenta outra vez."
+          : message || "Não foi possível criar a conta. Tenta outra vez."
       );
     } finally {
       setLoading(false);
@@ -175,7 +184,7 @@ export default function CriarConta({ onSubmit, tipoInicial = null }) {
                   type="email"
                   required
                   autoComplete="email"
-                  placeholder="o-teu@email.com"
+                  placeholder="teu@email.com"
                   value={form.email}
                   onChange={set("email")}
                   className={inputClass}

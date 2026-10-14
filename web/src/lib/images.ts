@@ -1,7 +1,7 @@
 // Imagens e padrões visuais do Me Encontra.
 // Tudo aqui é SVG gerado em código: não depende de internet nem de ficheiros externos.
 
-const toUri = (svg) =>
+const toUri = (svg: string) =>
     `data:image/svg+xml;utf8,${encodeURIComponent(svg.replace(/\s+/g, " ").trim())}`;
   
   // Padrão geométrico de losangos (inspirado nos padrões têxteis angolanos).
@@ -38,7 +38,7 @@ const toUri = (svg) =>
   </svg>`);
   
   // Usar em <img onError={onImgError} />
-  export function onImgError(e) {
+  export function onImgError(e: React.SyntheticEvent<HTMLImageElement>) {
     const img = e.currentTarget;
     img.onerror = null;
     img.src = PLACEHOLDER_PHOTO;

@@ -1,4 +1,4 @@
-const file = (name) => `/assets/image/${encodeURIComponent(name)}`;
+const file = (name: string) => `/assets/image/${encodeURIComponent(name)}`;
 
 /** Imagens originais de find/frontend/assets/image */
 export const ASSETS = {

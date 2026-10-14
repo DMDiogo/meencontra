@@ -1,19 +1,21 @@
-import { Search, Star, Store } from "lucide-react";
+import { Building2, Search, Store } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ASSETS } from "../lib/assets";
 import { PATTERN_LIGHT } from "../lib/images";
 
 const BENEFICIOS = [
   { Icon: Search, texto: "Descobre empresas e serviços perto de ti" },
-  { Icon: Star, texto: "Guarda favoritos e escreve avaliações" },
-  { Icon: Store, texto: "Divulga o teu negócio e recebe reservas" },
+  { Icon: Building2, texto: "Consulta os dados e as fotografias dos negócios" },
+  { Icon: Store, texto: "Publica o teu negócio no diretório" },
 ];
 
 /**
  * Estrutura partilhada por Login e Registar: painel de marca + cartão do formulário.
  * `width` controla a largura do cartão (ex.: "max-w-md", "max-w-xl").
  */
-export default function AuthLayout({ children, width = "max-w-md" }) {
+import type { ReactNode } from "react";
+
+export default function AuthLayout({ children, width = "max-w-md" }: { children: ReactNode; width?: string }) {
   return (
     <div className="grid min-h-screen lg:grid-cols-2">
       <aside className="relative hidden overflow-hidden bg-gradient-to-br from-brand-dark to-brand text-white lg:sticky lg:top-0 lg:block lg:h-screen">

@@ -1,10 +1,15 @@
-import { MapPin, Share2, Star } from "lucide-react";
+import { MapPin, Share2 } from "lucide-react";
 import { photoUrl } from "../lib/api";
 import { PLACEHOLDER_PHOTO, onImgError } from "../lib/images";
+import type { Empresa } from "../lib/types";
 
-export default function EmpresaCard({ empresa, onVer, onReservar, onClassificar, onShare }) {
-  const hasRating = empresa.rating !== undefined && empresa.rating !== null && empresa.rating !== "";
+type EmpresaCardProps = {
+  empresa: Empresa;
+  onVer: (empresa: Empresa) => void;
+  onShare: (empresa: Empresa) => void;
+};
 
+export default function EmpresaCard({ empresa, onVer, onShare }: EmpresaCardProps) {
   return (
     <article className="group flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
       <div className="relative overflow-hidden">
@@ -16,16 +21,6 @@ export default function EmpresaCard({ empresa, onVer, onReservar, onClassificar,
           className="h-36 w-full object-cover transition duration-500 group-hover:scale-[1.03] sm:h-40"
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/50 to-transparent" />
-
-        {hasRating && (
-          <span className="absolute left-2.5 top-2.5 inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-0.5 text-xs font-semibold text-slate-800 shadow-sm">
-            <Star size={12} className="text-amber-500" fill="currentColor" />
-            {empresa.rating}
-            {empresa.reviews ? (
-              <span className="text-[11px] font-medium text-slate-500">({empresa.reviews})</span>
-            ) : null}
-          </span>
-        )}
 
         {empresa.localizacao && (
           <span className="absolute bottom-2 left-2.5 right-2.5 flex items-center gap-1 truncate text-xs font-medium text-white">
@@ -48,21 +43,6 @@ export default function EmpresaCard({ empresa, onVer, onReservar, onClassificar,
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          {(empresa.tags || []).slice(0, 3).map((t) => (
-            <span key={t} className="rounded bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
-              {t}
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => onClassificar(empresa)}
-            className="rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
-          >
-            Classificar
-          </button>
-        </div>
-
         <p className="line-clamp-2 text-xs leading-relaxed text-slate-500">{empresa.biografia}</p>
 
         <div className="mt-auto flex flex-wrap gap-1.5 pt-0.5">
@@ -72,13 +52,6 @@ export default function EmpresaCard({ empresa, onVer, onReservar, onClassificar,
             className="rounded-md border border-slate-200 px-2.5 py-1 text-xs font-medium hover:bg-slate-50"
           >
             Ver
-          </button>
-          <button
-            type="button"
-            onClick={() => onReservar(empresa)}
-            className="rounded-md bg-brand px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-mid"
-          >
-            Reservar
           </button>
           <button
             type="button"

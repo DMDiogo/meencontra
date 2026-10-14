@@ -1,18 +1,15 @@
-import { ChevronLeft, ChevronRight, Search, SlidersHorizontal, Star } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import type { Empresa } from "../lib/types";
 import { Link } from "react-router-dom";
 import EmpresaCard from "../components/EmpresaCard";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import Modal from "../components/Modal";
 import Preloader from "../components/Preloader";
-import { listarEmpresas, photoUrl } from "../lib/api";
+import { listarEmpresasPublicadas, photoUrl } from "../lib/api";
 import { ASSETS } from "../lib/assets";
-import { DESTAQUES, DEMO_EMPRESAS, normalizeEmpresa } from "../lib/demoData";
 import { PATTERN_LIGHT, PLACEHOLDER_PHOTO, onImgError } from "../lib/images";
-
-const CATEGORIAS = ["Todos", "Restaurantes", "Hotéis", "Mobília", "Serviços"];
-const LOCAIS = ["", "Luanda", "Talatona", "Viana", "Benguela"];
 
 const fieldClass =
   "h-12 rounded-xl border border-slate-200 bg-white px-3.5 text-base text-slate-900 placeholder:text-slate-400 focus:border-brand focus:outline-none focus:ring-4 focus:ring-brand/15";
@@ -23,63 +20,41 @@ function irParaExplorar() {
 
 export default function Home() {
   const [loading, setLoading] = useState(true);
-  const [empresas, setEmpresas] = useState(DEMO_EMPRESAS);
-  const [fromApi, setFromApi] = useState(false);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
+  const [loadError, setLoadError] = useState("");
   const [q, setQ] = useState("");
   const [local, setLocal] = useState("");
   const [categoria, setCategoria] = useState("Todos");
-  const [preco, setPreco] = useState("all");
-  const [sort, setSort] = useState("featured");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
-  const [reserve, setReserve] = useState(null);
-  const [rate, setRate] = useState(null);
-  const [stars, setStars] = useState(0);
-  const [comment, setComment] = useState("");
+  const [detail, setDetail] = useState<Empresa | null>(null);
   const [toast, setToast] = useState("");
-  const scrollRef = useRef(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 900);
-    listarEmpresas()
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setEmpresas(data.map(normalizeEmpresa));
-          setFromApi(true);
-        }
+    listarEmpresasPublicadas()
+      .then(setEmpresas)
+      .catch((error: unknown) => {
+        setLoadError(error instanceof Error ? error.message : "Não foi possível carregar as empresas.");
       })
-      .catch(() => {});
-    return () => clearTimeout(t);
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
-    let list = empresas.filter((e) => {
+    return empresas.filter((e) => {
       const hay = `${e.nome} ${e.negocio} ${e.localizacao} ${e.biografia}`.toLowerCase();
       const matchesQ = !q.trim() || hay.includes(q.toLowerCase());
       const matchesLocal = !local || (e.localizacao || "").toLowerCase().includes(local.toLowerCase());
-      const matchesCat =
-        categoria === "Todos" || (e.negocio || "").toLowerCase().includes(categoria.toLowerCase().slice(0, 5));
-      const matchesPrice = preco === "all" || e.priceLevel === preco;
-      return matchesQ && matchesLocal && matchesCat && matchesPrice;
+      const matchesCat = categoria === "Todos" || (e.negocio || "").toLowerCase() === categoria.toLowerCase();
+      return matchesQ && matchesLocal && matchesCat;
     });
-    if (sort === "rating") list = [...list].sort((a, b) => b.rating - a.rating);
-    if (sort === "price_low") {
-      const map = { low: 1, mid: 2, high: 3 };
-      list = [...list].sort((a, b) => map[a.priceLevel] - map[b.priceLevel]);
-    }
-    if (sort === "price_high") {
-      const map = { low: 1, mid: 2, high: 3 };
-      list = [...list].sort((a, b) => map[b.priceLevel] - map[a.priceLevel]);
-    }
-    return list;
-  }, [empresas, q, local, categoria, preco, sort]);
+  }, [empresas, q, local, categoria]);
 
-  function showToast(msg) {
+  function showToast(msg: string) {
     setToast(msg);
     setTimeout(() => setToast(""), 2800);
   }
 
-  async function share(empresa) {
+  async function share(empresa: Empresa) {
     const payload = { title: empresa.nome, url: window.location.href };
     if (navigator.share) {
       try {
@@ -93,7 +68,11 @@ export default function Home() {
     }
   }
 
-  const heroFotos = DESTAQUES.slice(0, 3);
+  const heroFotos = empresas.slice(0, 3);
+  const categories = [...new Set(empresas.map((empresa) => empresa.negocio.trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
+  const locations = [...new Set(empresas.map((empresa) => empresa.localizacao.trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b));
 
   const selectClass =
     "w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20";
@@ -104,28 +83,10 @@ export default function Home() {
         <h3 className="mb-3 text-base font-semibold text-brand-dark">Filtrar por</h3>
         <label htmlFor="f-cat" className="mb-1 block text-sm text-slate-500">Categoria</label>
         <select id="f-cat" value={categoria} onChange={(e) => setCategoria(e.target.value)} className={`${selectClass} mb-3`}>
-          {CATEGORIAS.map((c) => (
+          {["Todos", ...categories].map((c) => (
             <option key={c}>{c}</option>
           ))}
         </select>
-        <label htmlFor="f-preco" className="mb-1 block text-sm text-slate-500">Preço</label>
-        <select id="f-preco" value={preco} onChange={(e) => setPreco(e.target.value)} className={`${selectClass} mb-3`}>
-          <option value="all">Qualquer</option>
-          <option value="low">Barato</option>
-          <option value="mid">Médio</option>
-          <option value="high">Caro</option>
-        </select>
-        <label htmlFor="f-sort" className="mb-1 block text-sm text-slate-500">Ordenar por</label>
-        <select id="f-sort" value={sort} onChange={(e) => setSort(e.target.value)} className={selectClass}>
-          <option value="featured">Destaques</option>
-          <option value="rating">Avaliação</option>
-          <option value="price_low">Preço (baixo)</option>
-          <option value="price_high">Preço (alto)</option>
-        </select>
-      </div>
-      <div className="rounded-2xl border border-slate-100 bg-white p-4">
-        <h4 className="text-sm font-semibold text-slate-800">Horários</h4>
-        <p className="mt-1 text-sm text-slate-500">Veja estabelecimentos e horários de funcionamento.</p>
       </div>
       <div className="rounded-2xl border border-slate-100 bg-white p-4">
         <h4 className="text-sm font-semibold text-slate-800">Dica</h4>
@@ -147,7 +108,7 @@ export default function Home() {
               Descubra empresas, serviços e móveis perto de si
             </h1>
             <p className="mt-4 max-w-lg text-pretty text-base text-slate-600 sm:text-lg">
-              Procure, compare avaliações, veja preços e reserve — tudo num só lugar.
+              Procure empresas locais e conheça os seus serviços, localização e fotografias.
             </p>
 
             <div className="mt-7 rounded-2xl border border-white bg-white/90 p-4 shadow-md sm:p-5">
@@ -167,7 +128,7 @@ export default function Home() {
                   className={`${fieldClass} sm:col-span-3`}
                 >
                   <option value="">Localidades</option>
-                  {LOCAIS.filter(Boolean).map((l) => (
+                  {locations.map((l) => (
                     <option key={l}>{l}</option>
                   ))}
                 </select>
@@ -182,14 +143,9 @@ export default function Home() {
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-2">
-                  {[
-                    ["Restaurantes", "fa-solid fa-utensils", "Restaurantes"],
-                    ["Hotéis", "fa-solid fa-hotel", "Hotéis"],
-                    ["Lojas", "fa-solid fa-store", "Mobília"],
-                    ["Serviços", "fa-solid fa-hammer", "Serviços"],
-                  ].map(([c, icon, cat]) => (
+                  {categories.slice(0, 4).map((cat) => (
                     <button
-                      key={c}
+                      key={cat}
                       type="button"
                       onClick={() => {
                         setCategoria(cat);
@@ -197,14 +153,13 @@ export default function Home() {
                       }}
                       className="rounded-lg bg-brand-soft px-3 py-1.5 text-sm font-medium text-brand-mid hover:bg-emerald-100"
                     >
-                      <i className={`${icon} me-2 text-xs`} />
-                      {c}
+                      <i className="fa-solid fa-store me-2 text-xs" />
+                      {cat}
                     </button>
                   ))}
                 </div>
                 <small className="text-sm text-slate-500">
                   Resultados: <strong>{filtered.length}</strong>
-                  {fromApi ? " (da base de dados)" : " (exemplos)"}
                 </small>
               </div>
             </div>
@@ -223,19 +178,15 @@ export default function Home() {
                     }`}
                   >
                     <img
-                      src={d.img}
+                      src={photoUrl(d.fotos)}
                       onError={onImgError}
                       alt=""
                       className="h-20 w-24 shrink-0 rounded-xl object-cover"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-slate-900">{d.nome}</p>
-                      <p className="truncate text-sm text-slate-500">{d.meta}</p>
-                      <p className="mt-1 text-xs text-slate-500">{d.reviews} avaliações</p>
+                      <p className="truncate text-sm text-slate-500">{d.negocio} • {d.localizacao}</p>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1 self-start rounded-lg bg-amber-400 px-2 py-1 text-sm font-bold text-slate-900">
-                      <Star size={13} fill="currentColor" /> {d.rating}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -278,19 +229,15 @@ export default function Home() {
                   <ChevronRight size={18} />
                 </button>
                 <div ref={scrollRef} className="no-scrollbar flex gap-4 overflow-x-auto pb-2">
-                  {DESTAQUES.map((d) => (
+                  {empresas.map((d) => (
                     <div
-                      key={d.nome}
+                      key={d.id}
                       className="min-w-[14rem] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm"
                     >
-                      <img src={d.img} onError={onImgError} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                      <img src={photoUrl(d.fotos)} onError={onImgError} alt="" loading="lazy" className="h-28 w-full object-cover" />
                       <div className="p-3">
                         <p className="font-semibold text-slate-900">{d.nome}</p>
-                        <p className="text-xs text-slate-500">{d.meta}</p>
-                        <p className="mt-2 text-sm">
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">{d.rating}</span>
-                          <span className="ml-2 text-slate-500">{d.reviews} avaliações</span>
-                        </p>
+                        <p className="text-xs text-slate-500">{d.negocio} • {d.localizacao}</p>
                       </div>
                     </div>
                   ))}
@@ -298,7 +245,13 @@ export default function Home() {
               </div>
             </div>
 
-            {filtered.length === 0 ? (
+            {loading ? (
+              <p className="rounded-2xl bg-white p-10 text-center text-slate-500">A carregar empresas...</p>
+            ) : loadError ? (
+              <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-red-800">
+                {loadError}
+              </p>
+            ) : filtered.length === 0 ? (
               <p className="rounded-2xl bg-white p-10 text-center text-slate-500">
                 Nenhum resultado. Ajuste a pesquisa ou os filtros.
               </p>
@@ -309,12 +262,6 @@ export default function Home() {
                     key={empresa.id}
                     empresa={empresa}
                     onVer={setDetail}
-                    onReservar={setReserve}
-                    onClassificar={(e) => {
-                      setRate(e);
-                      setStars(0);
-                      setComment("");
-                    }}
                     onShare={share}
                   />
                 ))}
@@ -334,8 +281,8 @@ export default function Home() {
           <div className="mt-10 grid gap-5 sm:grid-cols-3">
             {[
               ["fa-solid fa-magnifying-glass", "1. Pesquisa", "Encontra restaurantes, lojas e serviços próximos de ti."],
-              ["fa-solid fa-star", "2. Descobre", "Lê avaliações reais e vê fotos dos melhores locais."],
-              ["fa-solid fa-calendar-check", "3. Reserva", "Faz a tua reserva diretamente pelo site, sem complicações."],
+              ["fa-solid fa-image", "2. Descobre", "Consulta informação e fotografias dos estabelecimentos."],
+              ["fa-solid fa-location-dot", "3. Localiza", "Encontra o negócio e a sua localização no diretório."],
             ].map(([icon, t, d]) => (
               <div key={t} className="rounded-2xl bg-brand-soft p-7">
                 <i className={`${icon} text-2xl text-brand`} />
@@ -358,7 +305,7 @@ export default function Home() {
           <div className="max-w-xl">
             <h2 className="text-2xl font-bold sm:text-3xl">Tens um negócio?</h2>
             <p className="mt-2 text-base text-emerald-50">
-              Divulga o teu estabelecimento e recebe contactos e reservas de quem procura perto de ti.
+              Publica os dados e as fotografias do teu estabelecimento para aparecer no diretório.
             </p>
           </div>
           <Link
@@ -436,7 +383,7 @@ export default function Home() {
             <div className="mt-8 grid gap-5 text-center sm:grid-cols-3">
               {[
                 ["bi bi-bullseye", "Missão", "Conectar pessoas aos melhores restaurantes e experiências."],
-                ["bi bi-eye", "Visão", "Ser a plataforma nº1 em reservas e descobertas em Angola."],
+                ["bi bi-eye", "Visão", "Ser a plataforma nº1 na descoberta de negócios locais em Angola."],
                 ["bi bi-heart", "Valores", "Transparência, confiança, inovação e valorização local."],
               ].map(([icon, t, d]) => (
                 <div key={t}>
@@ -455,10 +402,10 @@ export default function Home() {
         <h2 className="text-center text-2xl font-bold text-brand-dark sm:text-3xl">Falar connosco</h2>
         <form
           className="mt-8 space-y-4 rounded-2xl border border-slate-100 bg-white p-6 shadow-sm"
-          onSubmit={(e) => {
+          onSubmit={(e: FormEvent<HTMLFormElement>) => {
             e.preventDefault();
             showToast("Mensagem enviada. Entraremos em contacto.");
-            e.target.reset();
+            e.currentTarget.reset();
           }}
         >
           <input required aria-label="Nome" placeholder="Nome" className={`${fieldClass} w-full`} />
@@ -499,93 +446,17 @@ export default function Home() {
                     {detail.localizacao} · {detail.negocio}
                   </p>
                 </div>
-                <span className="inline-flex h-fit items-center gap-1 rounded-lg bg-amber-400 px-2 py-1 font-bold">
-                  <Star size={14} /> {detail.rating}
-                </span>
               </div>
               <p className="mt-4 text-slate-600">{detail.biografia}</p>
               <ul className="mt-4 space-y-1 text-sm text-slate-500">
-                <li>Horário: 08:00 — 22:00</li>
-                <li>Telefone: +244 9XX XXX XXX</li>
-                <li>Endereço: {detail.localizacao}</li>
+                {detail.localizacao ? <li>Endereço: {detail.localizacao}</li> : null}
               </ul>
               <div className="mt-6 flex gap-2">
-                <button
-                  type="button"
-                  className="rounded-xl bg-brand px-5 py-2.5 font-semibold text-white hover:bg-brand-mid"
-                  onClick={() => {
-                    setReserve(detail);
-                    setDetail(null);
-                  }}
-                >
-                  Reservar
-                </button>
                 <button type="button" className="rounded-xl border px-5 py-2.5" onClick={() => setDetail(null)}>
                   Fechar
                 </button>
               </div>
             </div>
-          </div>
-        ) : null}
-      </Modal>
-
-      <Modal open={Boolean(reserve)} onClose={() => setReserve(null)} title={`Reservar — ${reserve?.nome || ""}`}>
-        <form
-          className="space-y-3 p-5"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setReserve(null);
-            showToast("Pedido de reserva enviado. Confirmaremos por telefone.");
-          }}
-        >
-          <input required name="name" aria-label="Nome" placeholder="Nome" className="w-full rounded-xl border px-3 py-2.5" />
-          <input name="phone" aria-label="Telefone" placeholder="Telefone" className="w-full rounded-xl border px-3 py-2.5" />
-          <div className="grid grid-cols-2 gap-3">
-            <input type="date" aria-label="Data" className="rounded-xl border px-3 py-2.5" />
-            <input type="time" aria-label="Hora" className="rounded-xl border px-3 py-2.5" />
-          </div>
-          <input type="number" min="1" defaultValue={2} aria-label="Pessoas" className="w-full rounded-xl border px-3 py-2.5" />
-          <button className="w-full rounded-xl bg-brand py-3 font-semibold text-white hover:bg-brand-mid">Enviar pedido</button>
-        </form>
-      </Modal>
-
-      <Modal open={Boolean(rate)} onClose={() => setRate(null)} title="Classificar">
-        {rate ? (
-          <div className="p-5">
-            <img
-              src={photoUrl(rate.fotos) || PLACEHOLDER_PHOTO}
-              onError={onImgError}
-              alt=""
-              className="mb-3 h-40 w-full rounded-xl object-cover"
-            />
-            <p className="mb-3 text-center font-semibold">{rate.nome}</p>
-            <div className="mb-3 flex justify-center gap-2">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button key={n} type="button" onClick={() => setStars(n)} aria-label={`${n} estrelas`}>
-                  <Star size={28} className={n <= stars ? "fill-amber-400 text-amber-400" : "text-amber-300"} />
-                </button>
-              ))}
-            </div>
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={3}
-              aria-label="Comentário"
-              placeholder="Escreva o seu comentário..."
-              className="w-full rounded-xl border px-3 py-2.5"
-            />
-            <button
-              type="button"
-              className="mt-3 w-full rounded-xl bg-brand py-3 font-semibold text-white hover:bg-brand-mid"
-              onClick={() => {
-                if (!stars) return showToast("Escolha uma classificação.");
-                if (!comment.trim()) return showToast("Escreva um comentário.");
-                setRate(null);
-                showToast("Avaliação enviada.");
-              }}
-            >
-              Enviar avaliação
-            </button>
           </div>
         ) : null}
       </Modal>
