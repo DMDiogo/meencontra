@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Admin from "./pages/Admin";
+import EmpresaDetalhe from "./pages/EmpresaDetalhe";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Proprietario from "./pages/Proprietario";
@@ -10,6 +11,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/empresa/:id" element={<EmpresaDetalhe />} />
         <Route path="/login" element={<Login />} />
         <Route path="/registar" element={<Registar />} />
         <Route path="/admin" element={<Admin />} />

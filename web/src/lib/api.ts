@@ -10,7 +10,23 @@ type EmpresaRow = {
   localizacao: string | null;
   biografia: string | null;
   status: EmpresaStatus;
+  created_at: string | null;
+  telefone: string | null;
+  email: string | null;
+  website: string | null;
+  instagram: string | null;
+  horario_funcionamento: unknown;
   empresa_fotos: { path: string; posicao: number }[];
+};
+
+/** Campos extra que a empresa passa a trazer (contactos, horário e data de criação). */
+type EmpresaExtra = {
+  telefone: string | null;
+  email: string | null;
+  website: string | null;
+  instagram: string | null;
+  horario_funcionamento: unknown;
+  created_at: string | null;
 };
 
 type EmpresaInput = {
@@ -18,10 +34,17 @@ type EmpresaInput = {
   negocio: string | null;
   localizacao: string | null;
   biografia: string | null;
+  telefone?: string | null;
+  email?: string | null;
+  website?: string | null;
+  instagram?: string | null;
+  horario_funcionamento?: unknown;
 };
 
 const BUCKET = "empresas";
 const MAX_FOTOS = 5;
+const EMPRESA_COLUMNS =
+  "id, nome, negocio, localizacao, biografia, status, created_at, telefone, email, website, instagram, horario_funcionamento, empresa_fotos(path, posicao)";
 const DEMO_PUBLICADAS: Empresa[] = DEMO_EMPRESAS.filter(
   (empresa) => empresa.negocio === "Restaurantes" || empresa.negocio === "Hotéis",
 );
@@ -33,7 +56,7 @@ function toEmpresa(row: EmpresaRow): Empresa {
     .map(({ path }) => storage.getPublicUrl(path).data.publicUrl);
   const negocio = row.negocio || "Serviços";
 
-  return {
+  const empresa: Empresa & EmpresaExtra = {
     id: row.id,
     nome: row.nome,
     negocio,
@@ -47,16 +70,42 @@ function toEmpresa(row: EmpresaRow): Empresa {
     reviews: 0,
     isDemo: false,
     status: row.status,
+    telefone: row.telefone,
+    email: row.email,
+    website: row.website,
+    instagram: row.instagram,
+    horario_funcionamento: row.horario_funcionamento,
+    created_at: row.created_at,
   };
+  return empresa;
 }
 
 function readEmpresaInput(formData: FormData): EmpresaInput {
-  return {
+  const input: EmpresaInput = {
     nome: String(formData.get("nome") || "").trim(),
     negocio: String(formData.get("negocio") || "").trim() || null,
     localizacao: String(formData.get("localizacao") || "").trim() || null,
     biografia: String(formData.get("biografia") || "").trim() || null,
   };
+
+  // Campos novos: só entram se vierem no formulário, para não apagar dados quando
+  // outro ecrã (ex.: o do administrador) edita a empresa sem os enviar.
+  for (const key of ["telefone", "email", "website", "instagram"] as const) {
+    if (formData.has(key)) input[key] = String(formData.get(key) || "").trim() || null;
+  }
+  if (formData.has("horario_funcionamento")) {
+    const raw = String(formData.get("horario_funcionamento") || "").trim();
+    if (!raw) {
+      input.horario_funcionamento = null;
+    } else {
+      try {
+        input.horario_funcionamento = JSON.parse(raw);
+      } catch {
+        throw new Error("Horário de funcionamento inválido.");
+      }
+    }
+  }
+  return input;
 }
 
 function readPhotoFiles(formData: FormData): File[] {
@@ -97,16 +146,17 @@ async function removeStoragePhotos(paths: string[]): Promise<void> {
   if (error) throw error;
 }
 
-async function listEmpresaRows(publicadasOnly: boolean): Promise<Empresa[]> {
+async function listEmpresaRows(publicadasOnly: boolean, donoId?: string): Promise<Empresa[]> {
   let query = getSupabase()
     .from("empresas")
-    .select("id, nome, negocio, localizacao, biografia, status, empresa_fotos(path, posicao)")
+    .select(EMPRESA_COLUMNS)
     .order("created_at", { ascending: false });
   if (publicadasOnly) query = query.eq("status", "publicada");
+  if (donoId) query = query.eq("dono_id", donoId);
 
   const { data, error } = await query;
   if (error) throw error;
-  return ((data || []) as EmpresaRow[]).map(toEmpresa);
+  return ((data || []) as unknown as EmpresaRow[]).map(toEmpresa);
 }
 
 export async function listarEmpresas(): Promise<Empresa[]> {
@@ -116,6 +166,18 @@ export async function listarEmpresas(): Promise<Empresa[]> {
   } catch {
     return DEMO_PUBLICADAS;
   }
+}
+
+/**
+ * Empresas do utilizador com sessão iniciada (painel do proprietário).
+ * Ao contrário de `listarEmpresas`, nunca devolve dados de demonstração:
+ * quem ainda não criou nenhuma empresa vê uma lista vazia.
+ */
+export async function listarMinhasEmpresas(): Promise<Empresa[]> {
+  const { data, error } = await getSupabase().auth.getUser();
+  if (error) throw error;
+  if (!data.user) return [];
+  return listEmpresaRows(false, data.user.id);
 }
 
 export async function listarEmpresasPublicadas(): Promise<Empresa[]> {

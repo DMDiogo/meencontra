@@ -1,7 +1,7 @@
 import { ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import type { Empresa } from "../lib/types";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import EmpresaCard from "../components/EmpresaCard";
 import Footer from "../components/Footer";
 import Header from "../components/Header";
@@ -18,7 +18,23 @@ function irParaExplorar() {
   document.getElementById("explorar")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
+/** Foto principal da empresa; sem fotos, usa a imagem padrão. */
+function foto(e: Empresa): string {
+  return photoUrl(e.fotos || []) || PLACEHOLDER_PHOTO;
+}
+
+/** "Negócio • Localização", ignorando o que estiver em branco. */
+function resumo(e: Empresa, sep = " • "): string {
+  return [e.negocio, e.localizacao].filter(Boolean).join(sep);
+}
+
+/** Endereço da página da empresa. */
+function paginaDe(e: Empresa): string {
+  return `/empresa/${e.id}`;
+}
+
 export default function Home() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -26,7 +42,6 @@ export default function Home() {
   const [local, setLocal] = useState("");
   const [categoria, setCategoria] = useState("Todos");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [detail, setDetail] = useState<Empresa | null>(null);
   const [toast, setToast] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +56,7 @@ export default function Home() {
 
   const filtered = useMemo(() => {
     return empresas.filter((e) => {
-      const hay = `${e.nome} ${e.negocio} ${e.localizacao} ${e.biografia}`.toLowerCase();
+      const hay = `${e.nome} ${e.negocio || ""} ${e.localizacao || ""} ${e.biografia || ""}`.toLowerCase();
       const matchesQ = !q.trim() || hay.includes(q.toLowerCase());
       const matchesLocal = !local || (e.localizacao || "").toLowerCase().includes(local.toLowerCase());
       const matchesCat = categoria === "Todos" || (e.negocio || "").toLowerCase() === categoria.toLowerCase();
@@ -55,7 +70,9 @@ export default function Home() {
   }
 
   async function share(empresa: Empresa) {
-    const payload = { title: empresa.nome, url: window.location.href };
+    // Partilha o link da página da própria empresa (e não o da página inicial)
+    const url = `${window.location.origin}${paginaDe(empresa)}`;
+    const payload = { title: empresa.nome, url };
     if (navigator.share) {
       try {
         await navigator.share(payload);
@@ -63,15 +80,15 @@ export default function Home() {
         /* ignore */
       }
     } else {
-      await navigator.clipboard.writeText(`${empresa.nome} — ${window.location.href}`);
+      await navigator.clipboard.writeText(`${empresa.nome} — ${url}`);
       showToast("Link copiado.");
     }
   }
 
   const heroFotos = empresas.slice(0, 3);
-  const categories = [...new Set(empresas.map((empresa) => empresa.negocio.trim()).filter(Boolean))]
+  const categories = [...new Set(empresas.map((empresa) => (empresa.negocio || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
-  const locations = [...new Set(empresas.map((empresa) => empresa.localizacao.trim()).filter(Boolean))]
+  const locations = [...new Set(empresas.map((empresa) => (empresa.localizacao || "").trim()).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b));
 
   const selectClass =
@@ -167,25 +184,32 @@ export default function Home() {
 
           {/* Pré-visualização de resultados: miniaturas pequenas, nítidas e úteis */}
           {heroFotos.length > 0 && (
-            <div className="relative hidden lg:col-span-5 lg:block" aria-hidden="true">
-              <div className="absolute -inset-6 -z-0 rounded-[2rem] bg-emerald-100/50" />
+            <div className="relative hidden lg:col-span-5 lg:block">
+              <div aria-hidden="true" className="absolute -inset-6 -z-0 rounded-[2rem] bg-emerald-100/50" />
               <div className="relative space-y-4">
                 {heroFotos.map((d, i) => (
                   <div
-                    key={d.nome}
+                    key={d.id}
                     className={`flex items-center gap-4 rounded-2xl bg-white p-3 shadow-lg ring-1 ring-emerald-100 ${
                       i === 0 ? "mr-10" : i === 1 ? "ml-10" : "mr-4"
                     }`}
                   >
-                    <img
-                      src={photoUrl(d.fotos)}
-                      onError={onImgError}
-                      alt=""
-                      className="h-20 w-24 shrink-0 rounded-xl object-cover"
-                    />
+                    <Link to={paginaDe(d)} tabIndex={-1} aria-hidden="true" className="shrink-0">
+                      <img
+                        src={foto(d)}
+                        onError={onImgError}
+                        alt=""
+                        className="h-20 w-24 rounded-xl object-cover"
+                      />
+                    </Link>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-slate-900">{d.nome}</p>
-                      <p className="truncate text-sm text-slate-500">{d.negocio} • {d.localizacao}</p>
+                      <Link
+                        to={paginaDe(d)}
+                        className="block truncate font-semibold text-slate-900 hover:text-brand hover:underline"
+                      >
+                        {d.nome}
+                      </Link>
+                      <p className="truncate text-sm text-slate-500">{resumo(d)}</p>
                     </div>
                   </div>
                 ))}
@@ -234,10 +258,17 @@ export default function Home() {
                       key={d.id}
                       className="min-w-[14rem] overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm"
                     >
-                      <img src={photoUrl(d.fotos)} onError={onImgError} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                      <Link to={paginaDe(d)} tabIndex={-1} aria-hidden="true">
+                        <img src={foto(d)} onError={onImgError} alt="" loading="lazy" className="h-28 w-full object-cover" />
+                      </Link>
                       <div className="p-3">
-                        <p className="font-semibold text-slate-900">{d.nome}</p>
-                        <p className="text-xs text-slate-500">{d.negocio} • {d.localizacao}</p>
+                        <Link
+                          to={paginaDe(d)}
+                          className="block font-semibold text-slate-900 hover:text-brand hover:underline"
+                        >
+                          {d.nome}
+                        </Link>
+                        <p className="text-xs text-slate-500">{resumo(d)}</p>
                       </div>
                     </div>
                   ))}
@@ -261,7 +292,7 @@ export default function Home() {
                   <EmpresaCard
                     key={empresa.id}
                     empresa={empresa}
-                    onVer={setDetail}
+                    onVer={(e) => navigate(paginaDe(e))}
                     onShare={share}
                   />
                 ))}
@@ -427,38 +458,6 @@ export default function Home() {
 
       <Modal open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtros">
         <div className="p-5">{Filters}</div>
-      </Modal>
-
-      <Modal open={Boolean(detail)} onClose={() => setDetail(null)} wide>
-        {detail ? (
-          <div className="grid md:grid-cols-2">
-            <img
-              src={photoUrl(detail.fotos) || PLACEHOLDER_PHOTO}
-              onError={onImgError}
-              alt=""
-              className="h-56 w-full object-cover md:h-full"
-            />
-            <div className="p-6">
-              <div className="flex justify-between gap-3 pr-8">
-                <div>
-                  <h3 className="text-xl font-bold">{detail.nome}</h3>
-                  <p className="text-sm text-slate-500">
-                    {detail.localizacao} · {detail.negocio}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-4 text-slate-600">{detail.biografia}</p>
-              <ul className="mt-4 space-y-1 text-sm text-slate-500">
-                {detail.localizacao ? <li>Endereço: {detail.localizacao}</li> : null}
-              </ul>
-              <div className="mt-6 flex gap-2">
-                <button type="button" className="rounded-xl border px-5 py-2.5" onClick={() => setDetail(null)}>
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </Modal>
 
       {toast ? (

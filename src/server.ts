@@ -1,11 +1,11 @@
-import express from "express";
-import empresaRoutes from "./routes/empresaRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
 import cors from "cors";
 import dotenv from "dotenv";
+import express from "express";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import adminRoutes from "./routes/adminRoutes.js";
+import empresaRoutes from "./routes/empresaRoutes.js";
 
 dotenv.config();
 
@@ -41,7 +41,7 @@ if (fs.existsSync(indexHtml)) {
   });
 }
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.listen(PORT, () => {
   console.log(`Me Encontra (React) em http://localhost:${PORT}`);

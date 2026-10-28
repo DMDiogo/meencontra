@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import ProprietarioDashboard from "../components/admin/ProprietarioDashboard";
-import { listarEmpresas } from "../lib/api";
+import ProprietarioDashboard, { type ConfigEmpresa, type NovaEmpresa } from "../components/admin/ProprietarioDashboard";
+import * as api from "../lib/api";
+import { criarEmpresa, listarMinhasEmpresas } from "../lib/api";
 import { getCurrentProfile, signOut, type Profile } from "../lib/auth";
 import type { Empresa } from "../lib/types";
 
 export default function Proprietario() {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [empresa, setEmpresa] = useState<Empresa | null>(null);
+  const [empresas, setEmpresas] = useState<Empresa[]>([]);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [loadError, setLoadError] = useState("");
 
@@ -20,8 +21,8 @@ export default function Proprietario() {
         if (!active) return;
         setProfile(current?.profile || null);
         if (current?.profile.role === "dono") {
-          const empresas = await listarEmpresas();
-          if (active) setEmpresa(empresas[0] || null);
+          const lista = await listarMinhasEmpresas();
+          if (active) setEmpresas(lista);
         }
       } catch (error) {
         if (active) {
@@ -36,6 +37,37 @@ export default function Proprietario() {
       active = false;
     };
   }, []);
+
+  async function criar(dados: NovaEmpresa, fotos: File[]) {
+    // criarEmpresa espera um FormData (usa formData.getAll internamente)
+    const formData = new FormData();
+    (Object.keys(dados) as (keyof NovaEmpresa)[]).forEach((k) => {
+      if (dados[k]) formData.append(k, dados[k]);
+    });
+    // A ordem importa: a 1.ª foto é a principal (cartão da Home), as seguintes (até 4) vão para a página da empresa.
+    fotos.forEach((foto) => formData.append("fotos", foto));
+    await criarEmpresa(formData);
+    setEmpresas(await listarMinhasEmpresas());
+  }
+
+  async function salvar(id: number | string, dados: ConfigEmpresa) {
+    // Precisa de uma função atualizarEmpresa em lib/api.ts (PATCH /api/empresas/:id)
+    const fn = (api as unknown as Record<string, unknown>).atualizarEmpresa;
+    if (typeof fn !== "function") {
+      throw new Error("Falta a função atualizarEmpresa em lib/api.ts.");
+    }
+    // Tal como criarEmpresa, atualizarEmpresa espera um FormData (usa formData.getAll internamente)
+    const formData = new FormData();
+    (Object.keys(dados) as (keyof ConfigEmpresa)[]).forEach((k) => {
+      if (k === "horario_funcionamento") {
+        formData.append(k, JSON.stringify(dados[k])); // o horário vai como JSON (coluna jsonb)
+      } else {
+        formData.append(k, dados[k] as string); // vazio também é enviado, para permitir limpar o campo
+      }
+    });
+    await (fn as (id: number | string, dados: FormData) => Promise<unknown>)(id, formData);
+    setEmpresas(await listarMinhasEmpresas());
+  }
 
   async function logout() {
     if (!confirm("Deseja realmente terminar a sessão?")) return;
@@ -68,8 +100,11 @@ export default function Proprietario() {
 
   return (
     <ProprietarioDashboard
-      nomeOrganizacao={empresa?.nome || ""}
+      nomeOrganizacao={empresas[0]?.nome || ""}
       nomeProprietario={profile.nome}
+      empresas={empresas}
+      onCriarEmpresa={criar}
+      onSalvarEmpresa={salvar}
       onLogout={logout}
     />
   );

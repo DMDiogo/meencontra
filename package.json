@@ -12,9 +12,21 @@
   },
   "type": "module",
   "scripts": {
-    "start": "npm run build:web && node src/server.js",
-    "dev": "npm run build:web && node --watch src/server.js",
+    "start": "npm run build && node dist-server/server.js",
+    "dev": "npm run build:web && tsx watch src/server.ts",
+    "build": "npm run build:server && npm run build:web",
+    "build:server": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && npm run typecheck --prefix web",
     "build:web": "npm run build --prefix web",
     "web": "npm run dev --prefix web"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   }
 }
